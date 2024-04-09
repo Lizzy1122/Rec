@@ -5,7 +5,11 @@ from tqdm import tqdm
 
 
 def get_score(model, n_users, n_items, train_user_dict, s, t):
+    print("n_users:" + str(n_users))
+    print("n_items:" + str(n_items))
+    print("all_embed.size:" + str(model.all_embed.size(0)))
     u_e, i_e = torch.split(model.all_embed, [n_users, n_items])
+    # u_e,i_e = torch.chunk(model.all_embed, 2,dim=0)
 
     u_e = u_e[s:t, :]
 

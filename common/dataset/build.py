@@ -1,5 +1,6 @@
 from torch.utils.data import DataLoader
-from common.dataset.dataset import TrainGenerator, TestGenerator
+# from common.dataset.dataset import TrainGenerator, TestGenerator
+from .dataset import TrainGenerator, TestGenerator
 
 
 def build_loader(args_config, graph):

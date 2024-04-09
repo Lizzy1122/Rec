@@ -8,9 +8,9 @@ def parse_args():
         "--data_path", nargs="?", default="../Data/", help="Input data path."
     )
     parser.add_argument(
-        "--dataset", nargs="?", default="last-fm", help="Choose a dataset."
+        "--dataset", nargs="?", default="last-fm-part", help="Choose a dataset."
     )
-    parser.add_argument("--emb_size", type=int, default=64, help="Embedding size.")
+    parser.add_argument("--emb_size", type=int, default=64, help="Embedding size.") # 64
     parser.add_argument(
         "--regs",
         nargs="?",
@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument(
         "--edge_threshold",
         type=int,
-        default=64,
+        default=32,  # 64
         help="edge threshold to filter knowledge graph",
     )
     parser.add_argument(
@@ -58,19 +58,19 @@ def parse_args():
 
     # ------------------------- experimental settings specific for recommender --------------------------------------------
     parser.add_argument(
-        "--batch_size", type=int, default=1024, help="batch size for training."
+        "--batch_size", type=int, default=1024, help="batch size for training."  # 1024
     )
     parser.add_argument(
-        "--test_batch_size", type=int, default=1024, help="batch size for test"
+        "--test_batch_size", type=int, default=1024, help="batch size for test"  # 1024
     )
     parser.add_argument("--num_threads", type=int, default=4, help="number of threads.")
-    parser.add_argument("--epoch", type=int, default=400, help="Number of epoch.")
-    parser.add_argument("--show_step", type=int, default=3, help="test step.")
+    parser.add_argument("--epoch", type=int, default=1, help="Number of epoch.")  # 400
+    parser.add_argument("--show_step", type=int, default=1, help="test step.") # 3
     parser.add_argument(
         "--adj_epoch", type=int, default=1, help="build adj matrix per _ epoch"
     )
     parser.add_argument(
-        "--pretrain_r", type=bool, default=True, help="use pretrained model or not"
+        "--pretrain_r", type=bool, default=False, help="use pretrained model or not"
     )
     parser.add_argument(
         "--freeze_s",
