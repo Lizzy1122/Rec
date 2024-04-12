@@ -177,9 +177,25 @@ class KGPolicy(nn.Module):
 
     @staticmethod
     def filter_entity(neg, item_range):
+
+        # print("neg:", neg.detach().cpu().numpy())
+
+        # if torch.any(neg > item_range[1]) or torch.any(neg < item_range[0]):
+        #     print("Out of range values detected")
+        #
+
         random_neg = torch.randint(
             int(item_range[0]), int(item_range[1] + 1), neg.size(), device=neg.device
         )
+
+        # print("neg max:", torch.max(neg))
+        # print("neg min:", torch.min(neg))
+        # print("item_range:", item_range)
+        # # print("neg:", neg)
+        # # print("item_range[1]:", item_range[1])
+        # # print("Condition neg > item_range[1]:", neg > item_range[1])
+        # # print("random_neg:", random_neg)
+
         neg[neg > item_range[1]] = random_neg[neg > item_range[1]]
         neg[neg < item_range[0]] = random_neg[neg < item_range[0]]
 

@@ -1,5 +1,6 @@
 import argparse
 
+#能跑通：last-fm-part train.dat test.dat kg_final
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run KGPolicy2.")
@@ -8,7 +9,7 @@ def parse_args():
         "--data_path", nargs="?", default="../Data/", help="Input data path."
     )
     parser.add_argument(
-        "--dataset", nargs="?", default="last-fm-part", help="Choose a dataset."
+        "--dataset", nargs="?", default="statics", help="Choose a dataset."
     )
     parser.add_argument("--emb_size", type=int, default=64, help="Embedding size.") # 64
     parser.add_argument(

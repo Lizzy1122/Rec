@@ -9,8 +9,8 @@ class CFData(object):
         self.args_config = args_config
 
         path = args_config.data_path + args_config.dataset
-        train_file = path + "/train.dat"
-        test_file = path + "/test.dat"
+        train_file = path + "/trans_train.dat"
+        test_file = path + "/trans_test.dat"
 
         # ----------get number of users and items & then load rating data from train_file & test_file------------
         self.train_data = self._generate_interactions(train_file)
@@ -92,7 +92,7 @@ class KGData(object):
         self.relation_start_id = relation_start_id
 
         path = args_config.data_path + args_config.dataset
-        kg_file = path + "/kg_final.txt"
+        kg_file = path + "/empty_kg.txt"
 
         # ----------get number of entities and relations & then load kg data from kg_file ------------.
         self.kg_data, self.kg_dict, self.relation_dict = self._load_kg(kg_file)
@@ -102,7 +102,7 @@ class KGData(object):
     def _load_kg(self, file_name):
         def _remap_kg_id(org_kg_np):
             new_kg_np = org_kg_np.copy()
-            # consider the number of users
+            # consider the number of users 头实体 尾实体都加上用户数量 n_user
             new_kg_np[:, 0] = org_kg_np[:, 0] + self.entity_start_id
             new_kg_np[:, 2] = org_kg_np[:, 2] + self.entity_start_id
             # consider two additional relations --- 'interact' and 'be_interacted_with'.
@@ -119,6 +119,7 @@ class KGData(object):
             return kg, rd
 
         # get triplets with canonical direction like <item, has-aspect, entity>
+        # 读取，去重
         can_kg_np = np.loadtxt(file_name, dtype=np.int32)
         can_kg_np = np.unique(can_kg_np, axis=0)
 
@@ -188,8 +189,8 @@ class CKGData(CFData, KGData):
         ckg_graph = nx.MultiDiGraph()
         print("Begin to load interaction triples ...")
         for u_id, i_id in tqdm(cf_mat, ascii=True):
-            ckg_graph.add_edges_from([(u_id, i_id)], r_id=0)
-            ckg_graph.add_edges_from([(i_id, u_id)], r_id=1)
+            ckg_graph.add_edges_from([(u_id, i_id)], r_id=0)  # 0表示 交互关系
+            ckg_graph.add_edges_from([(i_id, u_id)], r_id=1)  # 1表示 被交互关系
 
         print("\nBegin to load knowledge graph triples ...")
         for h_id, r_id, t_id in tqdm(kg_mat, ascii=True):

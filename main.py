@@ -54,71 +54,70 @@ def train_one_epoch(
         neg = batch_data["neg_i_id"]
         pos = batch_data["pos_i_id"]
         users = batch_data["u_id"]
-        print(batch_data)
-        print("neg:")
-        print(neg)
-        print("pos:")
-        print(pos)
-        print("users:")
-        print(users)
+        # print(batch_data)
+        # print("neg:")
+        # print(neg)
+        # print("pos:")
+        # print(pos)
+        # print("users:")
+        # print(users)
 
-    #     selected_neg_items_list, _ = sampler(batch_data, adj_matrix, edge_matrix)
-    #     selected_neg_items = selected_neg_items_list[-1, :]
-    #
-    #     train_set = train_data[users]
-    #     in_train = torch.sum(
-    #         selected_neg_items.unsqueeze(1) == train_set.long(), dim=1
-    #     ).bool()  # 修改了这里，把.byte()改成.bool()    # 每个选定的负样本是否在对应用户的训练集中？
-    #     selected_neg_items[in_train] = neg[in_train].long()  # 添加了.long()
-    #
-    #     base_loss_batch, reg_loss_batch = recommender(users, pos, selected_neg_items)
-    #     loss_batch = base_loss_batch + reg_loss_batch
-    #
-    #     loss_batch.backward()
-    #     recommender_optim.step()
-    #
-    #     """Train sampler network"""
-    #     sampler_optim.zero_grad()
-    #     selected_neg_items_list, selected_neg_prob_list = sampler(
-    #         batch_data, adj_matrix, edge_matrix
-    #     )
-    #
-    #     with torch.no_grad():
-    #         reward_batch = recommender.get_reward(users, pos, selected_neg_items_list)
-    #
-    #     epoch_reward += torch.sum(reward_batch)
-    #     reward_batch -= avg_reward
-    #
-    #     batch_size = reward_batch.size(1)
-    #     n = reward_batch.size(0) - 1
-    #     R = torch.zeros(batch_size, device=reward_batch.device)
-    #     reward = torch.zeros(reward_batch.size(), device=reward_batch.device)
-    #
-    #     gamma = args_config.gamma
-    #
-    #     for i, r in enumerate(reward_batch.flip(0)):
-    #         R = r + gamma * R
-    #         reward[n - i] = R
-    #
-    #     reinforce_loss = -1 * torch.sum(reward_batch * selected_neg_prob_list)
-    #     reinforce_loss.backward()
-    #     sampler_optim.step()
-    #
-    #     """record loss in an epoch"""
-    #     loss += loss_batch
-    #     reg_loss += reg_loss_batch
-    #     base_loss += base_loss_batch
-    #
-    # avg_reward = epoch_reward / num_batch
-    # train_res = PrettyTable()
-    # train_res.field_names = ["Epoch", "Loss", "BPR-Loss", "Regulation", "AVG-Reward"]
-    # train_res.add_row(
-    #     [cur_epoch, loss.item(), base_loss.item(), reg_loss.item(), avg_reward.item()]
-    # )
-    # print(train_res)
-    #
-    # return loss, base_loss, reg_loss, avg_reward
-    return
+        selected_neg_items_list, _ = sampler(batch_data, adj_matrix, edge_matrix)
+        selected_neg_items = selected_neg_items_list[-1, :]
+
+        train_set = train_data[users]
+        in_train = torch.sum(
+            selected_neg_items.unsqueeze(1) == train_set.long(), dim=1
+        ).bool()  # 修改了这里，把.byte()改成.bool()    # 每个选定的负样本是否在对应用户的训练集中？
+        selected_neg_items[in_train] = neg[in_train].long()  # 添加了.long()
+
+        base_loss_batch, reg_loss_batch = recommender(users, pos, selected_neg_items)
+        loss_batch = base_loss_batch + reg_loss_batch
+
+        loss_batch.backward()
+        recommender_optim.step()
+
+        """Train sampler network"""
+        sampler_optim.zero_grad()
+        selected_neg_items_list, selected_neg_prob_list = sampler(
+            batch_data, adj_matrix, edge_matrix
+        )
+
+        with torch.no_grad():
+            reward_batch = recommender.get_reward(users, pos, selected_neg_items_list)
+
+        epoch_reward += torch.sum(reward_batch)
+        reward_batch -= avg_reward
+
+        batch_size = reward_batch.size(1)
+        n = reward_batch.size(0) - 1
+        R = torch.zeros(batch_size, device=reward_batch.device)
+        reward = torch.zeros(reward_batch.size(), device=reward_batch.device)
+
+        gamma = args_config.gamma
+
+        for i, r in enumerate(reward_batch.flip(0)):
+            R = r + gamma * R
+            reward[n - i] = R
+
+        reinforce_loss = -1 * torch.sum(reward_batch * selected_neg_prob_list)
+        reinforce_loss.backward()
+        sampler_optim.step()
+
+        """record loss in an epoch"""
+        loss += loss_batch
+        reg_loss += reg_loss_batch
+        base_loss += base_loss_batch
+
+    avg_reward = epoch_reward / num_batch
+    train_res = PrettyTable()
+    train_res.field_names = ["Epoch", "Loss", "BPR-Loss", "Regulation", "AVG-Reward"]
+    train_res.add_row(
+        [cur_epoch, loss.item(), base_loss.item(), reg_loss.item(), avg_reward.item()]
+    )
+    print(train_res)
+
+    return loss, base_loss, reg_loss, avg_reward
 
 
 def save_model(file_name, model, config):
@@ -265,8 +264,8 @@ def train(train_loader, test_loader, graph, data_config, args_config):
     ndcgs = np.array(ndcg_loger)
     hit = np.array(hit_loger)
 
-    # best_rec_0 = max(recs[:, 0])
-    best_rec_0 = max(recs)
+    best_rec_0 = max(recs[:, 0])
+    # best_rec_0 = max(recs)
     idx = list(recs[:, 0]).index(best_rec_0)
 
     final_perf = (
