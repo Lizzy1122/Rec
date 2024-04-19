@@ -19,6 +19,8 @@ from common.dataset.build import build_loader
 from modules.sampler import KGPolicy
 from modules.recommender import MF
 
+from sklearn.metrics.pairwise import cosine_similarity
+
 
 def train_one_epoch(
     recommender,
@@ -179,6 +181,71 @@ def build_train_data(train_mat):
     return train_data
 
 
+# def calculate_item_popularity(interactions):
+#     item_popularity = {}
+#     for user, items in interactions.items():
+#         for item in items:
+#             if item not in item_popularity:
+#                 item_popularity[item] = 0
+#             item_popularity[item] += 1
+#     # 归一化流行度
+#     max_popularity = max(item_popularity.values())
+#     for item in item_popularity:
+#         item_popularity[item] /= max_popularity
+#     return item_popularity
+#
+#
+# def calculate_item_similarity(interactions, n_items):
+#     # 创建项目共现矩阵
+#     cooccurrence_matrix = np.zeros((n_items, n_items))
+#     for items in interactions.values():
+#         for i in items:
+#             for j in items:
+#                 if i != j:
+#                     cooccurrence_matrix[i, j] += 1
+#                     cooccurrence_matrix[j, i] += 1  # 因为是无向的
+#
+#     # 计算余弦相似度
+#     item_similarity = cosine_similarity(cooccurrence_matrix)
+#     return item_similarity
+
+
+# 计算 item_popularity
+def calculate_item_popularity(train_user_dict, n_items):
+    item_popularity = {i: 0 for i in range(n_items)}
+    for user, pos_items in train_user_dict.items():
+        for item in pos_items:
+            # 跳过超出范围的项目 ID
+            if item < 0 or item >= n_items:
+                continue
+            item_popularity[item] += 1
+    # 计算流行度的反数，以便用于新颖性计算
+    total_items = sum(item_popularity.values())
+    item_popularity = {item: popularity / total_items for item, popularity in item_popularity.items()}
+    return item_popularity
+
+
+# 计算 item_similarity
+def calculate_item_similarity(model, n_users, n_items):
+    # 获取项目嵌入向量
+    u_e, i_e = torch.split(model.all_embed, [n_users, n_items])
+    i_e = i_e.cpu().detach().numpy()  # 使用 .detach() 方法将张量与计算图分离
+
+    item_similarity = {}
+    for i in range(n_items):
+        for j in range(i + 1, n_items):
+            # 计算余弦相似度
+            dot_product = np.dot(i_e[i], i_e[j])
+            norm_i = np.linalg.norm(i_e[i])
+            norm_j = np.linalg.norm(i_e[j])
+            cosine_similarity = dot_product / (norm_i * norm_j)
+            # 存储项目相似度
+            item_similarity[(i, j)] = cosine_similarity
+            item_similarity[(j, i)] = cosine_similarity
+
+    return item_similarity
+
+
 def train(train_loader, test_loader, graph, data_config, args_config):
     """build padded training set"""
     train_mat = graph.train_user_dict
@@ -235,10 +302,18 @@ def train(train_loader, test_loader, graph, data_config, args_config):
             avg_reward,
         )
 
+        n_users = graph.n_users
+        n_items = graph.n_items
+        item_popularity = calculate_item_popularity(train_mat, n_items)
+        item_similarity = calculate_item_similarity(recommender, n_users, n_items)
+
+
+
+
         """Test"""
         if cur_epoch % args_config.show_step == 0:
             with torch.no_grad():
-                ret = test_v2(recommender, args_config.Ks, graph)
+                ret = test_v2(recommender, args_config.Ks, graph, item_popularity=item_popularity, item_similarity=item_similarity)
 
             loss_loger.append(loss)
             rec_loger.append(ret["recall"])
@@ -280,6 +355,8 @@ def train(train_loader, test_loader, graph, data_config, args_config):
         )
     )
     print(final_perf)
+    save_model('recommander', recommender, args_config)
+    save_model('sampler', sampler, args_config)
 
 
 if __name__ == "__main__":

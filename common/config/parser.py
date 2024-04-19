@@ -9,7 +9,7 @@ def parse_args():
         "--data_path", nargs="?", default="../Data/", help="Input data path."
     )
     parser.add_argument(
-        "--dataset", nargs="?", default="bridge_version6", help="Choose a dataset."
+        "--dataset", nargs="?", default="mooc_version8", help="Choose a dataset."
     )
     parser.add_argument("--emb_size", type=int, default=64, help="Embedding size.") # 64
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument(
         "--edge_threshold",
         type=int,
-        default=64,  # 64
+        default=32,  # 64
         help="edge threshold to filter knowledge graph",
     )
     parser.add_argument(
@@ -95,7 +95,8 @@ def parse_args():
 
     # ------------------------- experimental settings specific for testing ---------------------------------------------
     parser.add_argument(
-        "--Ks", nargs="?", default="[20, 40, 60, 80, 100]", help="evaluate K list"
+        # "--Ks", nargs="?", default="[20, 40, 60, 80, 100]", help="evaluate K list"
+        "--Ks", nargs="?", default="[10,11,12,13,14,15]", help="evaluate K list"
     )
 
     return parser.parse_args()
