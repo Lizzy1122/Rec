@@ -14,8 +14,21 @@ def get_score(model, n_users, n_items, train_user_dict, s, t):
     u_e = u_e[s:t, :]
 
     score_matrix = torch.matmul(u_e, i_e.t())
+    # print(train_user_dict)
+
     for u in range(s, t):
-        pos = train_user_dict[u]
+        # pos = train_user_dict[u]
+        # # print(f"User {u} positive samples: {pos}")
+        # idx = pos.index(-1) if -1 in pos else len(pos)
+        # score_matrix[u-s][pos[:idx] - n_users] = -1e5
+
+        pos = train_user_dict.get(u, [])
+        if not pos:  # 如果正样本物品列表为空，则跳过当前用户的处理，进入下一个用户的处理
+            # print(f"User {u} has no positive samples.")
+            continue
+        # else:  # 如果正样本物品列表不为空，则打印正样本列表
+        #     print(f"User {u} positive samples: {pos}")
+        # print(f"User {u} positive samples: {pos}")
         idx = pos.index(-1) if -1 in pos else len(pos)
         score_matrix[u-s][pos[:idx] - n_users] = -1e5
 
@@ -37,6 +50,13 @@ def cal_ndcg(topk, test_set, num_pos, k):
     return ndcg
 
 
+def cal_mrr(topk, test_set):
+    for rank, item in enumerate(topk, 1):
+        if item in test_set:
+            return 1 / rank
+    return 0
+
+
 def test_v2(model, ks, ckg, n_batchs=4):
     ks = eval(ks)
     train_user_dict, test_user_dict = ckg.train_user_dict, ckg.test_user_dict
@@ -51,6 +71,7 @@ def test_v2(model, ks, ckg, n_batchs=4):
         "recall": np.zeros(n_k),
         "ndcg": np.zeros(n_k),
         "hit_ratio": np.zeros(n_k),
+        "mrr": np.zeros(n_k),  # 添加 MRR 到结果字典
     }
 
     n_users = model.n_users
@@ -65,28 +86,42 @@ def test_v2(model, ks, ckg, n_batchs=4):
 
         score_matrix = get_score(model, n_users, n_items, train_user_dict, s, t)
         for i, k in enumerate(ks):
-            precision, recall, ndcg, hr = 0, 0, 0, 0
+            precision, recall, ndcg, hr, mrr = 0, 0, 0, 0, 0
             _, topk_index = torch.topk(score_matrix, k)
             topk_index = topk_index.cpu().numpy() + n_users
 
             for u in range(s, t):
-                gt_pos = test_user_dict[u]
-                topk = topk_index[u - s]
-                num_pos = len(gt_pos)
+                # gt_pos = test_user_dict[u]
+                # print(f"User {u} positive samples: {gt_pos}")
+                # topk = topk_index[u - s]  # 获取当前用户的top-k推荐列表
+                # num_pos = len(gt_pos)  # 获取当前用户的正样本数量
+                # print(f"获取当前用户的正样本数量{num_pos}")
 
-                topk_set = set(topk)
-                test_set = set(gt_pos)
-                num_hit = len(topk_set & test_set)
+                gt_pos = test_user_dict.get(u, [])
+                if not gt_pos:  # 如果正样本物品列表为空，则跳过当前用户的处理，进入下一个用户的处理
+                    # print(f"User {u} has no positive samples.")
+                    continue
+                # else:  # 如果正样本物品列表不为空，则打印正样本列表
+                #     print(f"User {u} positive samples: {gt_pos}")
+                topk = topk_index[u - s]  # 获取当前用户的top-k推荐列表
+                num_pos = len(gt_pos)  # 获取当前用户的正样本数量
+                print(f"获取当前用户的正样本数量{num_pos}")
+
+                topk_set = set(topk)  # 转换为集合方便计算
+                test_set = set(gt_pos)  # 转换为集合方便计算
+                num_hit = len(topk_set & test_set)  # 计算推荐列表和测试集正样本的交集数量
+                print(f"计算推荐列表和测试集正样本的交集数量{num_hit}")
 
                 precision += num_hit / k
                 recall += num_hit / num_pos
                 hr += 1 if num_hit > 0 else 0
 
                 ndcg += cal_ndcg(topk, test_set, num_pos, k)
-
+                mrr += cal_mrr(topk, test_set)
             result["precision"][i] += precision / n_test_users
             result["recall"][i] += recall / n_test_users
             result["ndcg"][i] += ndcg / n_test_users
             result["hit_ratio"][i] += hr / n_test_users
+            result["mrr"][i] += mrr / n_test_users  # 累加每个批次的 MRR
 
     return result

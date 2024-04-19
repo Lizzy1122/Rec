@@ -9,8 +9,8 @@ class CFData(object):
         self.args_config = args_config
 
         path = args_config.data_path + args_config.dataset
-        train_file = path + "/trans_train.dat"
-        test_file = path + "/trans_test.dat"
+        train_file = path + "/train.dat"
+        test_file = path + "/test.dat"
 
         # ----------get number of users and items & then load rating data from train_file & test_file------------
         self.train_data = self._generate_interactions(train_file)
@@ -92,7 +92,7 @@ class KGData(object):
         self.relation_start_id = relation_start_id
 
         path = args_config.data_path + args_config.dataset
-        kg_file = path + "/empty_kg.txt"
+        kg_file = path + "/kg_final.txt"
 
         # ----------get number of entities and relations & then load kg data from kg_file ------------.
         self.kg_data, self.kg_dict, self.relation_dict = self._load_kg(kg_file)
