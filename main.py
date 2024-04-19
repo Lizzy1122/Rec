@@ -277,7 +277,7 @@ def train(train_loader, test_loader, graph, data_config, args_config):
     recommender_optimer = torch.optim.Adam(recommender.parameters(), lr=args_config.rlr)
     sampler_optimer = torch.optim.Adam(sampler.parameters(), lr=args_config.slr)
 
-    loss_loger, pre_loger, rec_loger, ndcg_loger, hit_loger = [], [], [], [], []
+    loss_loger, pre_loger, rec_loger, ndcg_loger, hit_loger, mmr_loger, auc_loger, novelty_loger, diversity_loger = [], [], [], [], [], [], [], [], []
     stopping_step, cur_best_pre_0, avg_reward = 0, 0.0, 0
     t0 = time()
 
@@ -307,9 +307,6 @@ def train(train_loader, test_loader, graph, data_config, args_config):
         item_popularity = calculate_item_popularity(train_mat, n_items)
         item_similarity = calculate_item_similarity(recommender, n_users, n_items)
 
-
-
-
         """Test"""
         if cur_epoch % args_config.show_step == 0:
             with torch.no_grad():
@@ -320,6 +317,10 @@ def train(train_loader, test_loader, graph, data_config, args_config):
             pre_loger.append(ret["precision"])
             ndcg_loger.append(ret["ndcg"])
             hit_loger.append(ret["hit_ratio"])
+            mmr_loger.append(ret["mmr"])
+            auc_loger.append(ret["auc"])
+            novelty_loger.append(ret["novelty"])
+            diversity_loger.append(ret["diversity"])
 
             print_dict(ret)
 
@@ -338,13 +339,16 @@ def train(train_loader, test_loader, graph, data_config, args_config):
     pres = np.array(pre_loger)
     ndcgs = np.array(ndcg_loger)
     hit = np.array(hit_loger)
+    auc = np.array(auc_loger)
+    novelty = np.array(novelty_loger)
+    diversity = np.array(diversity_loger)
 
     best_rec_0 = max(recs[:, 0])
     # best_rec_0 = max(recs)
     idx = list(recs[:, 0]).index(best_rec_0)
 
     final_perf = (
-        "Best Iter=[%d]@[%.1f]\n recall=[%s] \n precision=[%s] \n hit=[%s] \n ndcg=[%s]"
+        "Best Iter=[%d]@[%.1f]\n recall=[%s] \n precision=[%s] \n hit=[%s] \n ndcg=[%s] \n auc=[%s] \n novelty=[%s] \n diversity=[%s]"
         % (
             idx,
             time() - t0,
@@ -352,6 +356,9 @@ def train(train_loader, test_loader, graph, data_config, args_config):
             "\t".join(["%.5f" % r for r in pres[idx]]),
             "\t".join(["%.5f" % r for r in hit[idx]]),
             "\t".join(["%.5f" % r for r in ndcgs[idx]]),
+            "\t".join(["%.5f" % r for r in auc[idx]]),
+            "\t".join(["%.5f" % r for r in novelty[idx]]),
+            "\t".join(["%.5f" % r for r in diversity[idx]]),
         )
     )
     print(final_perf)

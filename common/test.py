@@ -5,9 +5,9 @@ from tqdm import tqdm
 
 
 def get_score(model, n_users, n_items, train_user_dict, s, t):
-    print("n_users:" + str(n_users))
-    print("n_items:" + str(n_items))
-    print("all_embed.size:" + str(model.all_embed.size(0)))
+    # print("n_users:" + str(n_users))
+    # print("n_items:" + str(n_items))
+    # print("all_embed.size:" + str(model.all_embed.size(0)))
 
     u_e, i_e = torch.split(model.all_embed, [n_users, n_items])
 
@@ -110,7 +110,7 @@ def test_v2(model, ks, ckg, n_batchs=4, item_popularity=None, item_similarity=No
         "recall": np.zeros(n_k),
         "ndcg": np.zeros(n_k),
         "hit_ratio": np.zeros(n_k),
-        "mrr": np.zeros(n_k),
+        "mmr": np.zeros(n_k),
         "auc": np.zeros(n_k),
         "novelty": np.zeros(n_k),
         "diversity": np.zeros(n_k)
@@ -174,7 +174,7 @@ def test_v2(model, ks, ckg, n_batchs=4, item_popularity=None, item_similarity=No
                 metrics["recall"] += num_hit / num_pos
                 metrics["hit_ratio"] += 1 if num_hit > 0 else 0
                 metrics["ndcg"] += cal_ndcg(topk, test_set, num_pos, k)
-                metrics["mrr"] += cal_mrr(topk, test_set)
+                metrics["mmr"] += cal_mrr(topk, test_set)
                 metrics["auc"] += cal_auc(topk, test_set, all_items)
                 metrics["novelty"] += cal_novelty(topk, item_popularity)
                 metrics["diversity"] += cal_diversity(topk, item_similarity)
