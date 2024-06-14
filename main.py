@@ -1,3 +1,6 @@
+# import os
+# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
 import os
 import random
 
@@ -20,6 +23,8 @@ from modules.sampler import KGPolicy
 from modules.recommender import MF
 
 from sklearn.metrics.pairwise import cosine_similarity
+from scipy.sparse import lil_matrix
+import networkx as nx
 
 
 def train_one_epoch(
@@ -181,18 +186,7 @@ def build_train_data(train_mat):
     return train_data
 
 
-# def calculate_item_popularity(interactions):
-#     item_popularity = {}
-#     for user, items in interactions.items():
-#         for item in items:
-#             if item not in item_popularity:
-#                 item_popularity[item] = 0
-#             item_popularity[item] += 1
-#     # 归一化流行度
-#     max_popularity = max(item_popularity.values())
-#     for item in item_popularity:
-#         item_popularity[item] /= max_popularity
-#     return item_popularity
+
 #
 #
 # def calculate_item_similarity(interactions, n_items):
@@ -209,47 +203,181 @@ def build_train_data(train_mat):
 #     item_similarity = cosine_similarity(cooccurrence_matrix)
 #     return item_similarity
 
+# 用最大值归一化，并没有处理重映射问题，舍弃
+# def calculate_item_popularity(interactions):
+#     item_popularity = {}
+#     for user, items in interactions.items():
+#         for item in items:
+#             if item not in item_popularity:
+#                 item_popularity[item] = 0
+#             item_popularity[item] += 1
+#     # 归一化流行度
+#     max_popularity = max(item_popularity.values())
+#     for item in item_popularity:
+#         item_popularity[item] /= max_popularity
+#     return item_popularity
+
 
 # 计算 item_popularity
-def calculate_item_popularity(train_user_dict, n_items):
+# 注意：train_user_dict进行了重映射， item id from [0, #items) to [#users, #users + #items)
+def calculate_item_popularity(train_user_dict, n_users, n_items):
+    # 初始化字典来存储每个物品的交互次数
     item_popularity = {i: 0 for i in range(n_items)}
-    for user, pos_items in train_user_dict.items():
+    # 遍历训练集中的每个用户以及他们的交互物品列表
+    for user, pos_items in train_user_dict.items(): # 取每行字典
+        # 对用户交互的每个物品，增加其交互次数
         for item in pos_items:
             # 跳过超出范围的项目 ID
-            if item < 0 or item >= n_items:
+            if item - n_users < 0 or item - n_users >= n_items:
+                # print(f"用户 {user} 的交互列表中存在超出范围的 item ID: {item}")
                 continue
-            item_popularity[item] += 1
-    # 计算流行度的反数，以便用于新颖性计算
+            item_popularity[item - n_users] += 1
+
+
     total_items = sum(item_popularity.values())
+    # 如果总交互次数为零，打印警告信息并返回初始流行度字典
+    # if total_items == 0:
+    #     print("警告: 没有物品的交互记录或所有物品的 ID 超出了范围。")
+    #     return item_popularity
+
+    # 归一化
     item_popularity = {item: popularity / total_items for item, popularity in item_popularity.items()}
+
     return item_popularity
 
 
-# 计算 item_similarity
-def calculate_item_similarity(model, n_users, n_items):
-    # 获取项目嵌入向量
-    u_e, i_e = torch.split(model.all_embed, [n_users, n_items])
-    i_e = i_e.cpu().detach().numpy()  # 使用 .detach() 方法将张量与计算图分离
+# 计算 item_similarity  时间太长，资源不够
+# def calculate_item_similarity(model, n_users, n_items):
+#     # 获取项目嵌入向量
+#     u_e, i_e = torch.split(model.all_embed, [n_users, n_items])
+#     i_e = i_e.cpu().detach().numpy()  # 使用 .detach() 方法将张量与计算图分离
+#
+#     item_similarity = {}
+#     for i in range(n_items):
+#         for j in range(i + 1, n_items):
+#             # 计算余弦相似度
+#             dot_product = np.dot(i_e[i], i_e[j])
+#             norm_i = np.linalg.norm(i_e[i])
+#             norm_j = np.linalg.norm(i_e[j])
+#             cosine_similarity = dot_product / (norm_i * norm_j)
+#             # 存储项目相似度
+#             item_similarity[(i, j)] = cosine_similarity
+#             item_similarity[(j, i)] = cosine_similarity
+#
+#     return item_similarity
 
-    item_similarity = {}
-    for i in range(n_items):
-        for j in range(i + 1, n_items):
-            # 计算余弦相似度
-            dot_product = np.dot(i_e[i], i_e[j])
-            norm_i = np.linalg.norm(i_e[i])
-            norm_j = np.linalg.norm(i_e[j])
-            cosine_similarity = dot_product / (norm_i * norm_j)
-            # 存储项目相似度
-            item_similarity[(i, j)] = cosine_similarity
-            item_similarity[(j, i)] = cosine_similarity
+# def calculate_item_similarity(recommender, n_users, n_items):
+#     # 从模型中获取用户和物品的嵌入
+#     u_e, i_e = np.split(recommender.all_embed.detach().cpu().numpy(), [n_users])
+#
+#     # 使用 cosine_similarity 函数计算物品之间的相似性
+#     item_similarity = cosine_similarity(i_e)
+#
+#     # 返回计算得到的物品相似性矩阵
+#     return item_similarity
 
+# 需要分配的数组资源太大，需要重新写
+# def calculate_item_similarity(train_user_dict, n_items):
+#     # Initialize item-item similarity matrix
+#     item_similarity = np.zeros((n_items, n_items))
+#
+#     # Calculate item-item similarity
+#     for item1 in range(n_items):
+#         for item2 in range(n_items):
+#             if item1 != item2:  # Exclude self-similarity
+#                 # Compute similarity between item1 and item2 based on their co-occurrence in user interactions
+#                 common_users = set(train_user_dict.get(item1, [])) & set(train_user_dict.get(item2, []))
+#                 similarity = len(common_users) / np.sqrt(len(train_user_dict[item1]) * len(train_user_dict[item2]))
+#                 item_similarity[item1, item2] = similarity
+#                 # Check if both items have interactions
+#                 if item1 in train_user_dict and item2 in train_user_dict:
+#                     # Compute similarity between item1 and item2 based on their co-occurrence in user interactions
+#                     common_users = set(train_user_dict[item1]) & set(train_user_dict[item2])
+#                     similarity = len(common_users) / np.sqrt(len(train_user_dict[item1]) * len(train_user_dict[item2]))
+#                 else:
+#                     similarity = 0  # Set similarity to 0 if one or both items have no interactions
+#                 item_similarity[item1, item2] = similarity
+#
+#     return item_similarity
+
+# 利用稀疏矩阵，还是太复杂了，所需时间太长
+# def calculate_item_similarity(train_user_dict, n_items, threshold=0.1):
+#     # Initialize item-item similarity matrix as a LIL sparse matrix
+#     item_similarity = lil_matrix((n_items, n_items), dtype=np.float32)
+#
+#     # Calculate item-item similarity
+#     for item1 in range(n_items):
+#         for item2 in range(item1 + 1, n_items):
+#             if item1 in train_user_dict and item2 in train_user_dict:
+#                 common_users = set(train_user_dict[item1]) & set(train_user_dict[item2])
+#                 if common_users:
+#                     similarity = len(common_users) / np.sqrt(len(train_user_dict[item1]) * len(train_user_dict[item2]))
+#                     if similarity > threshold:
+#                         item_similarity[item1, item2] = similarity
+#                         item_similarity[item2, item1] = similarity
+#
+#     return item_similarity.tocsr()
+
+# 无法对多重图使用
+# def calculate_item_similarity(G):
+#     # 使用 Jaccard 系数计算相似度
+#     preds = nx.jaccard_coefficient(G)
+#     similarity = {}
+#     for u, v, p in preds:
+#         if p > 0:  # 可以设置阈值过滤
+#             similarity[(u, v)] = p
+#     return similarity
+
+# 多重图转简单图
+def convert_multigraph_to_simple_graph(multigraph):
+    simple_graph = nx.Graph()
+    for u, v, data in multigraph.edges(data=True):
+        # 每个节点对只添加一次边，无视多重边
+        if not simple_graph.has_edge(u, v):
+            simple_graph.add_edge(u, v)
+    return simple_graph
+
+# 计算杰卡德相似度
+def calculate_jaccard_similarity(multigraph):
+    # 转换为简单图
+    simple_graph = convert_multigraph_to_simple_graph(multigraph)
+    # 初始化进度条
+    edges = list(simple_graph.edges())
+    pbar = tqdm(total=len(edges), desc="Calculating Jaccard Similarity")
+
+    # 计算Jaccard相似度
+    similarities = []
+    for u, v in edges:
+        union_size = len(set(simple_graph.neighbors(u)) | set(simple_graph.neighbors(v)))
+        intersection_size = len(set(simple_graph.neighbors(u)) & set(simple_graph.neighbors(v)))
+        if union_size > 0:
+            similarity = intersection_size / union_size
+            similarities.append((u, v, similarity))
+        pbar.update(1)
+    pbar.close()
+    return similarities
+
+
+# 利用矩阵分解MF来计算相似度
+def calculate_item_similarity(recommender, n_users, n_items):
+    # 从模型中获取用户和物品的嵌入
+    # _, i_e = torch.split(recommender.all_embed.detach().cpu().numpy(), [n_users])
+    u_e, i_e = torch.split(recommender.all_embed, [n_users, n_items])
+
+    # 将物品嵌入转换为 NumPy 数组
+    i_e = i_e.detach().cpu().numpy()
+
+    # 使用 cosine_similarity 函数计算物品之间的相似性
+    item_similarity = cosine_similarity(i_e)
+
+    # 返回计算得到的物品相似性矩阵
     return item_similarity
 
 
 def train(train_loader, test_loader, graph, data_config, args_config):
     """build padded training set"""
     train_mat = graph.train_user_dict
-    # print(train_mat) # 带-1填充的字典，可是这个时候还没填充呢，是哪里设置的？回去看看
+    # print(train_mat) # 带-1填充的字典，可是这个时候还没填充呢，是哪里设置的？回去检查
     train_data = build_train_data(train_mat)
 
     # 加载预训练模型
@@ -281,6 +409,19 @@ def train(train_loader, test_loader, graph, data_config, args_config):
     stopping_step, cur_best_pre_0, avg_reward = 0, 0.0, 0
     t0 = time()
 
+    n_users = graph.n_users
+    n_items = graph.n_items
+    print("计算流行度...")
+    item_popularity = calculate_item_popularity(train_mat, n_users, n_items)
+    print("计算相似度...")
+    # item_similarity = calculate_item_similarity(train_user_dict=train_mat, n_items=n_items)  #使用相似矩阵计算
+    item_similarity = calculate_item_similarity(recommender, n_users, n_items)  # 使用MF计算
+    # item_similarity = calculate_item_similarity(graph.ckg_graph)  # 使用图计算
+    # 暂不处理
+    # item_similarity = calculate_jaccard_similarity(graph.ckg_graph)
+    # item_similarity_dict = {(u, v): s for u, v, s in item_similarity}
+
+
     for epoch in range(args_config.epoch):
         if epoch % args_config.adj_epoch == 0:
             """sample adjacency matrix"""
@@ -302,14 +443,12 @@ def train(train_loader, test_loader, graph, data_config, args_config):
             avg_reward,
         )
 
-        n_users = graph.n_users
-        n_items = graph.n_items
-        item_popularity = calculate_item_popularity(train_mat, n_items)
-        item_similarity = calculate_item_similarity(recommender, n_users, n_items)
-
         """Test"""
         if cur_epoch % args_config.show_step == 0:
             with torch.no_grad():
+                # ret = test_v2(recommender, args_config.Ks, graph, item_popularity=item_popularity)
+                # 暂不处理
+                # ret = test_v2(recommender, args_config.Ks, graph, item_popularity=item_popularity, item_similarity=item_similarity_dict)
                 ret = test_v2(recommender, args_config.Ks, graph, item_popularity=item_popularity, item_similarity=item_similarity)
 
             loss_loger.append(loss)
@@ -320,6 +459,7 @@ def train(train_loader, test_loader, graph, data_config, args_config):
             mmr_loger.append(ret["mmr"])
             auc_loger.append(ret["auc"])
             novelty_loger.append(ret["novelty"])
+            # 暂不处理
             diversity_loger.append(ret["diversity"])
 
             print_dict(ret)
@@ -342,6 +482,8 @@ def train(train_loader, test_loader, graph, data_config, args_config):
     auc = np.array(auc_loger)
     novelty = np.array(novelty_loger)
     diversity = np.array(diversity_loger)
+    # 暂不处理
+
 
     best_rec_0 = max(recs[:, 0])
     # best_rec_0 = max(recs)
@@ -358,12 +500,14 @@ def train(train_loader, test_loader, graph, data_config, args_config):
             "\t".join(["%.5f" % r for r in ndcgs[idx]]),
             "\t".join(["%.5f" % r for r in auc[idx]]),
             "\t".join(["%.5f" % r for r in novelty[idx]]),
+            # "\t".join(["%.5f" % r for r in novelty[idx]]),
+    # 暂不处理
             "\t".join(["%.5f" % r for r in diversity[idx]]),
         )
     )
-    print(final_perf)
-    save_model('recommander', recommender, args_config)
-    save_model('sampler', sampler, args_config)
+    print("\n" + final_perf)
+    save_model('recommender_bridge', recommender, args_config)
+    save_model('sampler_bridge', sampler, args_config)
 
 
 if __name__ == "__main__":

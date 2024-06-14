@@ -9,7 +9,7 @@ def parse_args():
         "--data_path", nargs="?", default="../Data/", help="Input data path."
     )
     parser.add_argument(
-        "--dataset", nargs="?", default="mooc_version8", help="Choose a dataset."
+        "--dataset", nargs="?", default="static-pykt", help="Choose a dataset."
     )
     parser.add_argument("--emb_size", type=int, default=64, help="Embedding size.") # 64
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument(
         "--edge_threshold",
         type=int,
-        default=32,  # 64
+        default=64,  # 64
         help="edge threshold to filter knowledge graph",
     )
     parser.add_argument(
@@ -65,8 +65,8 @@ def parse_args():
         "--test_batch_size", type=int, default=1024, help="batch size for test"  # 1024
     )
     parser.add_argument("--num_threads", type=int, default=4, help="number of threads.")
-    parser.add_argument("--epoch", type=int, default=1, help="Number of epoch.")  # 400
-    parser.add_argument("--show_step", type=int, default=1, help="test step.") # 3
+    parser.add_argument("--epoch", type=int, default=30, help="Number of epoch.")  # 400
+    parser.add_argument("--show_step", type=int, default=3, help="test step.") # 3
     parser.add_argument(
         "--adj_epoch", type=int, default=1, help="build adj matrix per _ epoch"
     )
@@ -96,7 +96,7 @@ def parse_args():
     # ------------------------- experimental settings specific for testing ---------------------------------------------
     parser.add_argument(
         # "--Ks", nargs="?", default="[20, 40, 60, 80, 100]", help="evaluate K list"
-        "--Ks", nargs="?", default="[10,11,12,13,14,15]", help="evaluate K list"
+        "--Ks", nargs="?", default="[40, 50, 60, 70, 80, 90]", help="evaluate K list"
     )
 
     return parser.parse_args()
